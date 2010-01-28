@@ -4,7 +4,7 @@ class Fail
 end
 
 describe Fail do
-  100.times do
+  1000.times do
     if (rand(10) % 3).zero?
       it('should fail') { true.should be_false }
     else

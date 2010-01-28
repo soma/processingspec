@@ -6,45 +6,76 @@ module Processing ; SKETCH_PATH = __FILE__ ; end
 
 class SpecSketch < Processing::App
   attr_reader :number_of_examples
+  load_libraries 'boids', 'opengl'
+  import "processing.opengl" if library_loaded? "opengl"
+  full_screen
+
+  SpecFlock = Struct.new(:flocks, :color, :n, :flee)
 
   def setup
-    smooth
+    library_loaded?(:opengl) ? setup_opengl : render_mode(P3D)
+    sphere_detail 8
+    color_mode RGB, 1.0
     no_stroke
     frame_rate 30
-    color_mode RGB, 1
+    shininess 1.0
+    specular 0.3, 0.1, 0.1
+    emissive 0.03, 0.03, 0.1
 
     reset_number_of_examples!(0)
   end
   
   def reset_number_of_examples!(num)
     @number_of_examples = num
-    @results = []
+    @flocks = {
+      :passed => SpecFlock.new([Boids.flock(20, 0, 0, width, height)], color(0,255,0), 0, false),
+      :failed => SpecFlock.new([Boids.flock(20, 0, 0, width, height)], color(255,0,0), 0, false),
+      :pending => SpecFlock.new([Boids.flock(20, 0, 0, width, height)], color(255,255,0), 0, false)
+    }
+    @flocks.values.each do |sf|
+      sf.flocks.each{|f|f.goal(width/2, height/2, 0); f.scatter(0)}
+    end
   end
 
   def add_result!(result)
-    @results << result
+    @flocks.values.each {|f|f.flee = false}
+    @flocks[result].n += 1
+    @flocks[result].flee = true
+
+    if @flocks[result].n % 20 == 0
+      @flocks[result].flocks << Boids.flock(20, 0, 0, width, height)
+    end
+
+    @flocks.values.each do |sf|
+      sf.flocks.each{|f|f.goal(width/2, height/2, 0); f.scatter(0)}
+    end
+    
+  end
+
+  def setup_opengl
+    render_mode(OPENGL)
+    hint ENABLE_OPENGL_4X_SMOOTH
   end
 
   def draw
-    background(0)
+    background 0.05
+    ambient_light 0.01, 0.01, 0.01
+    light_specular 0.4, 0.2, 0.2
+    point_light 1.0, 1.0, 1.0, mouse_x, mouse_y, 190
 
-    if number_of_examples > 0
-      example_width = self.width / number_of_examples.to_f
-
-      number_of_examples.times do |i|
-        case @results[i]
-        when :passed
-          fill(0.0, 1.0, 0.0)
-        when :failed
-          fill(1.0, 0.0, 0.0)
-        when :pending
-          fill(1.0, 1.0, 0.0)
-        else
-          fill(0.3, 0.3, 0.3)
+    @flocks.values.each_with_index do |sflock, i|
+      sflock.flocks.each do |flock|
+        flock.goal mouse_x, mouse_y, 0, sflock.flee
+        flock.update(:goal => 185, :limit => 13.5)
+        flock.each do |boid|
+          r = 20 + (boid.z * 0.15)
+          alpha = (boid.z * 0.01) + sflock.n / @number_of_examples.to_f
+          fill(sflock.color)
+          push_matrix
+          translate boid.x-r/2, boid.y-r/2, boid.z-r/2
+          oval(0, 0, r, r)
+          pop_matrix
         end
-
-        x = i * example_width
-        rect(x, 0, example_width, self.height)
       end
     end
   end
