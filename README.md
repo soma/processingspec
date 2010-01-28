@@ -12,3 +12,4 @@ Type:
 
     jruby -S rake spec
 
+# NOW WITH ADDED LOLLERBOIDS!!
